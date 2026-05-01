@@ -38,17 +38,24 @@ const LoginPage = () => {
     }
 
     try {
-      await login(formData.email, formData.password);
-      // Redirection selon le rôle
-      if (state.user?.role === "CHARGEUR") {
+      const user = await login(formData.email, formData.password);
+
+      if (user.role === "CHARGEUR") {
         navigate("/chargeur");
-      } else if (state.user?.role === "LIVREUR") {
+      } else if (user.role === "LIVREUR") {
         navigate("/livreur");
-      } else if (state.user?.role === "ADMIN") {
+      } else if (user.role === "ADMIN") {
         navigate("/admin");
+      } else {
+        navigate("/dashboard");
       }
-    } catch (error) {
-      setErrors({ email: "Email ou mot de passe incorrect" });
+    } catch (error: any) {
+      setErrors({
+        email:
+          error.response?.data?.message ||
+          error.message ||
+          "Email ou mot de passe incorrect",
+      });
     }
   };
 

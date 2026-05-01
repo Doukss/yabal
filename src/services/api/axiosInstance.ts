@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getToken, removeToken } from '../../utils/storage';
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_API_URL || '',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -25,7 +25,9 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthRequest = error.config?.url?.includes('/api/auth/');
+
+    if (error.response?.status === 401 && !isAuthRequest) {
       removeToken();
       window.location.href = '/login';
     }

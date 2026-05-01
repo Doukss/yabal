@@ -78,7 +78,9 @@ const RegisterPage = () => {
     } catch (error: any) {
       setErrors({
         general:
-          error.response?.data?.message || "Erreur lors de l'inscription",
+          error.response?.data?.message ||
+          error.message ||
+          "Erreur lors de l'inscription",
       });
     }
   };

@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useReducer, useEffect } from "react";
-import {
-  login as loginService,
-  register as registerService,
-  getMe,
-} from "../../services/api/auth.service";
-import type { LoginResponse, RegisterData } from "../../services/api/auth.service";
-import { getToken, setToken, removeToken } from "../../utils/storage";
-
-type User = LoginResponse["user"];
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { login as loginService, register as registerService, getMe } from '../../services/api/auth.service';
+import type { RegisterData, User } from '../../services/api/auth.service';
+import { 
+  setToken, 
+  removeToken, 
+  setUser, 
+  getUser, 
+  getToken, 
+  isAuthenticated
+} from '../../utils/storage';
 
 interface AuthState {
   user: User | null;
@@ -17,62 +18,79 @@ interface AuthState {
 }
 
 type AuthAction =
-  | { type: "LOGIN_START" }
-  | { type: "LOGIN_SUCCESS"; payload: User }
-  | { type: "LOGIN_FAILURE"; payload: string }
-  | { type: "LOGOUT" }
-  | { type: "SET_USER"; payload: User };
+  | { type: 'LOGIN_START' }
+  | { type: 'LOGIN_SUCCESS'; payload: User }
+  | { type: 'LOGIN_FAILURE'; payload: string }
+  | { type: 'LOGOUT' }
+  | { type: 'SET_USER'; payload: User };
 
 const initialState: AuthState = {
-  user: null,
+  user: getUser(), // Charger depuis localStorage au démarrage
   isLoading: false,
-  isAuthenticated: false,
+  isAuthenticated: isAuthenticated(),
   error: null,
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
-    case "LOGIN_START":
+    case 'LOGIN_START':
       return { ...state, isLoading: true, error: null };
-    case "LOGIN_SUCCESS":
-      return {
-        ...state,
-        isLoading: false,
-        isAuthenticated: true,
-        user: action.payload,
+    case 'LOGIN_SUCCESS':
+      return { 
+        ...state, 
+        isLoading: false, 
+        isAuthenticated: true, 
+        user: action.payload 
       };
-    case "LOGIN_FAILURE":
+    case 'LOGIN_FAILURE':
       return { ...state, isLoading: false, error: action.payload };
-    case "LOGOUT":
-      return { ...state, isAuthenticated: false, user: null };
-    case "SET_USER":
+    case 'LOGOUT':
+      return { 
+        ...state, 
+        isAuthenticated: false, 
+        user: null,
+        error: null 
+      };
+    case 'SET_USER':
       return { ...state, isAuthenticated: true, user: action.payload };
     default:
       return state;
   }
 };
 
-const AuthContext = createContext<{
+interface AuthContextType {
   state: AuthState;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  register: (data: RegisterData) => Promise<User>;
   logout: () => void;
-} | null>(null);
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Vérifier et restaurer la session au chargement
   useEffect(() => {
     const initAuth = async () => {
       const token = getToken();
-      if (token) {
+      const savedUser = getUser();
+      
+      if (token && savedUser && !state.user) {
+        if (token.startsWith('local-')) {
+          dispatch({ type: 'SET_USER', payload: savedUser });
+          return;
+        }
+
         try {
+          // Optionnel: vérifier que le token est encore valide
           const user = await getMe();
-          dispatch({ type: "SET_USER", payload: user });
-        } catch {
+          dispatch({ type: 'SET_USER', payload: user });
+          setUser(user);
+        } catch (error) {
+          // Token invalide, on déconnecte
           removeToken();
+          dispatch({ type: 'LOGOUT' });
         }
       }
     };
@@ -80,16 +98,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const login = async (email: string, password: string) => {
-    dispatch({ type: "LOGIN_START" });
+    dispatch({ type: 'LOGIN_START' });
     try {
       const { token, user } = await loginService(email, password);
+      
+      // Stocker dans localStorage
       setToken(token);
-      dispatch({ type: "LOGIN_SUCCESS", payload: user });
+      setUser(user);
+      
+      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
+      return user;
     } catch (error: any) {
-      const message = error.response?.data?.message || "Erreur de connexion";
-      dispatch({
-        type: "LOGIN_FAILURE",
-        payload: message,
+      dispatch({ 
+        type: 'LOGIN_FAILURE', 
+        payload: error.response?.data?.message || error.message || 'Erreur de connexion' 
+      });
+      throw error;
+    }
+  };
+
+  const register = async (data: RegisterData) => {
+    dispatch({ type: 'LOGIN_START' });
+    try {
+      const { token, user } = await registerService(data);
+      
+      // Stocker dans localStorage
+      setToken(token);
+      setUser(user);
+      
+      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
+      return user;
+    } catch (error: any) {
+      dispatch({ 
+        type: 'LOGIN_FAILURE', 
+        payload: error.response?.data?.message || error.message || "Erreur d'inscription" 
       });
       throw error;
     }
@@ -97,23 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = () => {
     removeToken();
-    dispatch({ type: "LOGOUT" });
-  };
-
-  // Dans AuthContext.tsx, ajoute cette fonction
-  const register = async (data: RegisterData) => {
-    dispatch({ type: "LOGIN_START" });
-    try {
-      const { token, user } = await registerService(data);
-      setToken(token);
-      dispatch({ type: "LOGIN_SUCCESS", payload: user });
-    } catch (error: any) {
-      dispatch({
-        type: "LOGIN_FAILURE",
-        payload: error.response?.data?.message || "Erreur d'inscription",
-      });
-      throw error;
-    }
+    dispatch({ type: 'LOGOUT' });
   };
 
   return (
@@ -125,6 +151,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
   return context;
 };
