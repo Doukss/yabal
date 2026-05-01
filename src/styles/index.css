@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@theme {
+  --color-primary: #f59e0b;
+  --color-secondary: #3b82f6;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-dark: #1f2937;
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-display: Poppins, Inter, sans-serif;
+}
+
+:root,
+[data-theme] {
+  --color-primary: #f59e0b;
+  --color-secondary: #3b82f6;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-dark: #1f2937;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: Inter, system-ui, sans-serif;
+}
