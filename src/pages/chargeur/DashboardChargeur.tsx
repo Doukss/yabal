@@ -334,7 +334,7 @@ const DashboardChargeur = () => {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all ${
                 activeTab === item.id
-                  ? "bg-primary text-white shadow-md"
+                  ? " bg-gray-300 text-white shadow-md"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
             >
